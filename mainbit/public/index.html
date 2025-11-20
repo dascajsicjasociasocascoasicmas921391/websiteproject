@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Frosty Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+  * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+  body { height: 100vh; overflow: hidden; display: flex; justify-content: center; align-items: center; background: #0f172a; position: relative; color: #f3f4f6; }
+  canvas { position: absolute; top: 0; left: 0; z-index: 0; width: 100%; height: 100%; }
+  .container { position: relative; z-index: 1; background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border-radius: 20px; padding: 30px; width: 100%; max-width: 650px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); overflow: hidden; }
+  h1 { text-align: center; margin-bottom: 10px; font-size: 28px; color: #93c5fd; }
+  #datetime { text-align: center; margin-bottom: 20px; font-size: 16px; color: #60a5fa; font-weight: 500; }
+
+  .tabs { display: flex; justify-content: space-around; margin-bottom: 25px; }
+  .tab { padding: 12px 25px; cursor: pointer; border-radius: 12px 12px 0 0; background: rgba(255,255,255,0.1); color: #60a5fa; font-weight: 600; transition: all 0.3s ease; }
+  .tab.active { background: rgba(255,255,255,0.25); color: #f3f4f6; }
+  .tab-content { display: none; animation: fadeIn 0.4s ease-in-out; }
+  .tab-content.active { display: block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  form label { display: block; margin-top: 15px; font-weight: 600; color: #60a5fa; }
+  form input, form textarea { width: 100%; padding: 12px; margin-top: 6px; border-radius: 10px; border: none; outline: none; background: rgba(255,255,255,0.1); color: #f3f4f6; font-size: 14px; }
+  form textarea { resize: vertical; }
+  button { margin-top: 20px; width: 100%; padding: 14px; border: none; border-radius: 12px; background: #3b82f6; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+  button:hover { background: #2563eb; transform: translateY(-2px); }
+  .status { margin-top: 15px; text-align: center; font-weight: 500; }
+  .status.success { color: #22c55e; }
+  .status.error { color: #ef4444; }
+
+  .info-panel { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; line-height: 1.6; box-shadow: inset 0 0 15px rgba(255,255,255,0.05); }
+  .info-panel h3 { color: #93c5fd; margin-bottom: 10px; }
+  .info-panel ul { margin-left: 20px; }
+  .info-panel li { margin-bottom: 8px; }
+
+  /* Modern Toggle Switch */
+  .toggle-container { display: flex; align-items: center; justify-content: space-between; margin: 15px 0; }
+  .toggle-label { font-weight: 600; color: #60a5fa; }
+  .toggle { position: relative; width: 55px; height: 28px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.3); border-radius: 34px; transition: 0.4s; }
+  .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.4s; }
+  .toggle input:checked + .slider { background: #3b82f6; }
+  .toggle input:checked + .slider:before { transform: translateX(27px); }
+
+  /* Bottom-left info label */
+  .bottom-left-label {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    background: rgba(255,255,255,0.05);
+    color: #60a5fa;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 999;
+    max-width: 250px;
+  }
+</style>
+</head>
+<body>
+<canvas id="weather"></canvas>
+<div class="container">
+  <h1>Frosty Dashboard ❄️🌧</h1>
+  <div id="datetime"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="send">Send Message</div>
+    <div class="tab" data-tab="info">Info</div>
+    <div class="tab" data-tab="settings">Settings</div>
+  </div>
+
+  <!-- Send Message Tab -->
+  <div class="tab-content active" id="send">
+    <form id="webhookForm">
+      <label for="webhook">Webhook URL</label>
+      <input type="text" id="webhook" placeholder="Enter Discord webhook URL" required />
+      <label for="content">Message Content</label>
+      <textarea id="content" rows="4" placeholder="Enter message..." required></textarea>
+      <label for="username">Username (optional)</label>
+      <input type="text" id="username" placeholder="Optional username" />
+      <label for="avatar_url">Avatar URL (optional)</label>
+      <input type="text" id="avatar_url" placeholder="Optional avatar URL" />
+      <label for="embed_title">Embed Title (optional)</label>
+      <input type="text" id="embed_title" placeholder="Optional embed title" />
+      <label for="embed_desc">Embed Description (optional)</label>
+      <textarea id="embed_desc" rows="3" placeholder="Optional embed description"></textarea>
+      <button type="submit">Send Message</button>
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+
+  <!-- Info Tab -->
+  <div class="tab-content" id="info">
+    <div class="info-panel">
+      <h3>Dashboard Info</h3>
+      <p>This dashboard allows you to send messages to Discord webhooks with optional embeds.</p>
+      <ul>
+        <li>Enter your webhook URL.</li>
+        <li>Add message content, username, avatar URL.</li>
+        <li>Optionally include embed title & description.</li>
+        <li>Click "Send Message" to deliver it.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div class="tab-content" id="settings">
+    <div class="info-panel">
+      <h3>Weather Settings</h3>
+      <p>Toggle rain and snow effects:</p>
+      <div class="toggle-container">
+        <span class="toggle-label">Rain</span>
+        <label class="toggle"><input type="checkbox" id="toggleRain" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-container">
+        <span class="toggle-label">Snow</span>
+        <label class="toggle"><input type="checkbox" id="toggleSnow" checked><span class="slider"></span></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Bottom-left Info -->
+<div id="bottomInfo" class="bottom-left-label">
+  ❄️ Frosty Dashboard Active<br>
+  Active Tab: Send Message<br>
+  Rain: ON | Snow: ON<br>
+  Messages Sent: 0
+</div>
+
+<script>
+  // Date & Time
+  const datetimeEl = document.getElementById('datetime');
+  function updateDateTime() {
+    const now = new Date();
+    datetimeEl.textContent = now.toLocaleString('en-AU', { weekday:'short', year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  setInterval(updateDateTime, 1000);
+  updateDateTime();
+
+  // Canvas Weather
+  const canvas = document.getElementById('weather');
+  const ctx = canvas.getContext('2d');
+  let w = canvas.width = window.innerWidth;
+  let h = canvas.height = window.innerHeight;
+  const rainDrops = [];
+  const snowFlakes = [];
+  let rainOn = true;
+  let snowOn = true;
+  for (let i=0;i<300;i++) rainDrops.push({x:Math.random()*w, y:Math.random()*h, length:10+Math.random()*20, velocity:2+Math.random()*4});
+  for (let i=0;i<150;i++) snowFlakes.push({x:Math.random()*w, y:Math.random()*h, radius:1+Math.random()*3, velocity:1+Math.random()*2, swing:Math.random()*0.5});
+  function animate() {
+    ctx.clearRect(0,0,w,h);
+    if(rainOn){ ctx.strokeStyle='rgba(174,194,224,0.5)'; ctx.lineWidth=1; ctx.lineCap='round';
+      rainDrops.forEach(d=>{ ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x,d.y+d.length); ctx.stroke(); d.y+=d.velocity; if(d.y>h){ d.y=-d.length; d.x=Math.random()*w; }}); }
+    if(snowOn){ ctx.fillStyle='rgba(255,255,255,0.8)';
+      snowFlakes.forEach(s=>{ ctx.beginPath(); ctx.arc(s.x,s.y,s.radius,0,Math.PI*2); ctx.fill(); s.y+=s.velocity; s.x+=Math.sin(s.y*0.01)*s.swing; if(s.y>h){ s.y=-s.radius; s.x=Math.random()*w; }}); }
+    requestAnimationFrame(animate);
+  }
+  animate();
+  window.addEventListener('resize', ()=>{ w=canvas.width=window.innerWidth; h=canvas.height=window.innerHeight; });
+
+  // Tabs
+  const tabs=document.querySelectorAll('.tab');
+  const contents=document.querySelectorAll('.tab-content');
+  tabs.forEach(tab=>{ tab.addEventListener('click', ()=>{
+    tabs.forEach(t=>t.classList.remove('active'));
+    contents.forEach(c=>c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  }) });
+
+  // Toggle switches
+  document.getElementById('toggleRain').addEventListener('change', e => { rainOn = e.target.checked; });
+  document.getElementById('toggleSnow').addEventListener('change', e => { snowOn = e.target.checked; });
+
+  // Bottom-left dynamic info
+  const bottomInfo = document.getElementById('bottomInfo');
+  let messagesSent = 0;
+  function updateBottomInfo() {
+    const activeTab = document.querySelector('.tab.active').textContent;
+    const rainStatus = rainOn ? 'ON' : 'OFF';
+    const snowStatus = snowOn ? 'ON' : 'OFF';
+    bottomInfo.innerHTML = `
+      ❄️ Created by Frostyxneo, For any support, feel free to reach out. <br>`;
+  }
+  setInterval(updateBottomInfo, 1000);
+  updateBottomInfo();
+
+  // Webhook Form
+  const form=document.getElementById('webhookForm');
+  const statusDiv=document.getElementById('status');
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const webhook=document.getElementById('webhook').value.trim();
+    const content=document.getElementById('content').value.trim();
+    const username=document.getElementById('username').value.trim();
+    const avatar_url=document.getElementById('avatar_url').value.trim();
+    const embed_title=document.getElementById('embed_title').value.trim();
+    const embed_desc=document.getElementById('embed_desc').value.trim();
+    const embeds=[];
+    if(embed_title||embed_desc) embeds.push({title:embed_title||undefined, description:embed_desc||undefined, color:3447003});
+    statusDiv.textContent="Sending..."; statusDiv.className="status";
+    try {
+      const res=await fetch("/api/send", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({webhook, content, username, avatar_url, embeds})
+      });
+      const data=await res.json();
+      if(res.ok&&data.ok){statusDiv.textContent="✅ Message sent successfully!"; statusDiv.className="status success"; form.reset(); messagesSent++;}
+      else{statusDiv.textContent=`❌ ${data.error||"Failed to send message"}`; statusDiv.className="status error";}
+    } catch(err){statusDiv.textContent=`❌ ${err.message}`; statusDiv.className="status error";}
+  });
+</script>
+</body>
+</html>
